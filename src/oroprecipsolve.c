@@ -273,7 +273,7 @@ int solve_sparse_mkl(struct SCSR3_t *s, double *b, double *x, int cleanup) {
 
     assert (s != NULL);
 
-    mkl_verbose(1);
+    //mkl_verbose(1);
     mkl_set_num_threads(1);  // Use pure MPI
     iparm = get_iparm();
 

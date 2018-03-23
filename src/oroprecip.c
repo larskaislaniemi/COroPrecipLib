@@ -208,7 +208,6 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
 
 
     /* Solve it! */
-
     solve_sparse_mkl(A, b, x, 0);
 
     /* Transform solution vector to qc and qs components */
@@ -220,6 +219,9 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
             p[i*nx + j] = qs[i*nx + j] / tauf;
         }
     }
+
+	/* Cleanup call */
+    solve_sparse_mkl(A, b, x, 1);
 
     free(qs);
     free(qc);
