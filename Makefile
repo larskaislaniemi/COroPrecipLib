@@ -8,6 +8,9 @@ BINOUT=bin
 SRCDIR=src
 INCDIR=inc
 
+#OPTS=-DDEBUG
+OPTS=
+
 all: oroprecip liboroprecip.so liboroprecip.a m_oroprecip.mod
 	mv *.o lib/
 
@@ -16,15 +19,15 @@ alllib: liboroprecip.so liboroprecip.a m_oroprecip.mod
 
 oroprecip: $(DEPS)
 	mkdir -p $(BINOUT)
-	$(CC) -DOROPRECIP_STANDALONE=1 $(CFLAGS) -o bin/$@ $(SRCDIR)/*.c
+	$(CC) -DOROPRECIP_STANDALONE=1 $(OPTS) $(CFLAGS) -o bin/$@ $(SRCDIR)/*.c
 
 liboroprecip.so: $(DEPS)
 	mkdir -p $(LIBOUT)
-	$(CC) -DOROPRECIP_STANDALONE=0 $(CFLAGS) -shared -fPIC -o lib/$@ $(SRCDIR)/*.c
+	$(CC) -DOROPRECIP_STANDALONE=0 $(OPTS) $(CFLAGS) -shared -fPIC -o lib/$@ $(SRCDIR)/*.c
 
 liboroprecip.a: $(DEPS)
 	mkdir -p $(LIBOUT)
-	$(CC) -DOROPRECIP_STANDALONE=0 $(CFLAGS) -c $(SRCDIR)/*.c
+	$(CC) -DOROPRECIP_STANDALONE=0 $(OPTS) $(CFLAGS) -c $(SRCDIR)/*.c
 	ar rcs lib/$@ *.o
 
 m_oroprecip.mod: $(DEPS)

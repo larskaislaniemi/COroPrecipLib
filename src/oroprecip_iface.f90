@@ -8,6 +8,8 @@ module m_oroprecip
         double precision :: U(2)
         double precision :: tauc, tauf, Sbg
         integer :: sink_at_downslope
+        integer :: downsample
+        double precision :: z0
     end type oroprecip_options
 
     type oroprecip_thermodyn

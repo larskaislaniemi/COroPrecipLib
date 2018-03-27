@@ -37,6 +37,8 @@ struct cfg_options {
     double tauc, tauf;     // Moisture conversion / precipitation time delays
     double Sbg;            // Background precipitation source
     int sink_at_downslope; // Allow negative precipitation at downslope side?
+	int downsample;        // downsample topography by this value
+	double z0;             // reference level (sealevel)
 };
 
 

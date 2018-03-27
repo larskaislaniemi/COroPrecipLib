@@ -37,6 +37,10 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
      *      sink_at_downslope [int]
      *                      0: Source term may become negative at downslope
      *                      1: Source term always >= 0
+	 *      downsample [int]
+	 *                      Downsample topography resolution by this coef
+	 *                      Used resolution <- Input resolution / 2^downsample
+	 *      z0 [double]     Reference level for topography; z_eff = z - z0
      *
      *  struct cfg_thermodyn *ct has following fields:
      *      rho_ref [double]    Density of air at reference level
@@ -58,17 +62,24 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     int nx, ny;
     int N, dof;
     double dx, dy;
-    double *qc, *qs, *S, *grh;
+    double *qc, *qs, *S, *grh, *loh;
     double U[2];
     double tauc, tauf;
     double ddx, ddy;
+	int resdiv;
+	int subnx, subny;
 
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
     MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
 
+	/* Calculate downsampling */
+	resdiv = powl(2, co->downsample);
+	assert (2*resdiv < co->nx);
+	assert (2*resdiv < co->ny);
+
     /* Shorthand notation */
-    nx = co->nx; ny = co->ny;
-    dx = co->dx; dy = co->dy;
+    nx = co->nx / resdiv; ny = co->ny / resdiv;
+    dx = co->dx * resdiv; dy = co->dy * resdiv;
     U[IX] = co->U[IX]; U[IY] = co->U[IY];
     tauc = co->tauc; tauf = co->tauf;
 
@@ -82,11 +93,13 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     qc  = (double *)malloc(sizeof(double)*N);
     qs  = (double *)malloc(sizeof(double)*N);
     S   = (double *)malloc(sizeof(double)*N);
+    loh = (double *)malloc(sizeof(double)*N);
     grh = (double *)malloc(sizeof(double)*2*N);
 
     assert (qs != NULL);
     assert (qc != NULL);
     assert (S != NULL);
+    assert (loh != NULL);
     assert (grh != NULL);
 
     /* Set up matrices/vectors */
@@ -109,22 +122,35 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     assert (b != NULL);
     assert (x != NULL);
 
+	/* Do downsampling */
+	for (int i = 0; i < ny; i++) {
+		for (int j = 0; j < nx; j++) {
+			loh[i*nx + j] = 0.0;
+			for (int k = 0; k < resdiv; k++) {
+				for (int l = 0; l < resdiv; l++) {
+					loh[i*nx + j] += h[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)];
+				}
+			}
+			loh[i*nx + j] /= resdiv*resdiv;
+		}
+	}
+
     /* Calculate grad h */
     for (int i = 1; i < ny-1; i++) {
         for (int j = 1; j < nx-1; j++) {
-            grh[2*(i*nx + j) + IY] = (h[(i+1)*nx+j] - h[(i-1)*nx+j]) / ddy;
-            grh[2*(i*nx + j) + IX] = (h[i*nx+j+1] - h[i*nx+j-1]) / ddx;
+            grh[2*(i*nx + j) + IY] = (loh[(i+1)*nx+j] - loh[(i-1)*nx+j]) / ddy;
+            grh[2*(i*nx + j) + IX] = (loh[i*nx+j+1] - loh[i*nx+j-1]) / ddx;
         }
-        grh[2*(i*nx + 0   ) + IY] = (h[(i+1)*nx+0] - h[(i-1)*nx+0]) / ddy;
-        grh[2*(i*nx + 0   ) + IX] = (h[i*nx+1] - h[i*nx+0]) / dx;               // gives some error...
-        grh[2*(i*nx + nx-1) + IY] = (h[(i+1)*nx+nx-1] - h[(i-1)*nx+nx-1]) / ddy;
-        grh[2*(i*nx + nx-1) + IX] = (h[i*nx+nx-1] - h[i*nx+nx-2]) / dx;         // ... this one, too
+        grh[2*(i*nx + 0   ) + IY] = (loh[(i+1)*nx+0] - loh[(i-1)*nx+0]) / ddy;
+        grh[2*(i*nx + 0   ) + IX] = (loh[i*nx+1] - loh[i*nx+0]) / dx;               // gives some error...
+        grh[2*(i*nx + nx-1) + IY] = (loh[(i+1)*nx+nx-1] - loh[(i-1)*nx+nx-1]) / ddy;
+        grh[2*(i*nx + nx-1) + IX] = (loh[i*nx+nx-1] - loh[i*nx+nx-2]) / dx;         // ... this one, too
     }
     for (int j = 1; j < nx-1; j++) {
-        grh[2*(0*nx + j) + IY] = (h[1*nx+j] - h[0*nx+j]) / dy;                  // gives some error ...
-        grh[2*(0*nx + j) + IX] = (h[0*nx+j+1] - h[0*nx+j-1]) / ddx;
-        grh[2*((ny-1)*nx + j) + IY] = (h[(ny-1)*nx+j] - h[(ny-2)*nx+j]) / dy;             // ... this one, too
-        grh[2*((ny-1)*nx + j) + IX] = (h[(ny-1)*nx+j+1] - h[(ny-1)*nx+j-1]) / ddx;
+        grh[2*(0*nx + j) + IY] = (loh[1*nx+j] - loh[0*nx+j]) / dy;                  // gives some error ...
+        grh[2*(0*nx + j) + IX] = (loh[0*nx+j+1] - loh[0*nx+j-1]) / ddx;
+        grh[2*((ny-1)*nx + j) + IY] = (loh[(ny-1)*nx+j] - loh[(ny-2)*nx+j]) / dy;             // ... this one, too
+        grh[2*((ny-1)*nx + j) + IX] = (loh[(ny-1)*nx+j+1] - loh[(ny-1)*nx+j-1]) / ddx;
     }
     grh[2*(0*nx + 0) + IY] = grh[2*(0*nx + 1) + IY];
     grh[2*(0*nx + 0) + IX] = grh[2*(1*nx + 0) + IY];
@@ -139,7 +165,7 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     for (int i = 1; i < ny-1; i++) {
         for (int j = 1; j < nx-1; j++) {
             S[i*nx + j] = (U[IY] * grh[2*(i*nx + j) + IY] + U[IX] * grh[2*(i*nx + j) + IX]);
-            S[i*nx + j] *= ct->rho_ref * ct->qsat_ref * exp(-h[i*nx + j] / ct->Hm);
+            S[i*nx + j] *= ct->rho_ref * ct->qsat_ref * exp(-(loh[i*nx + j] - co->z0) / ct->Hm);
             S[i*nx + j] += co->Sbg;
             if (co->sink_at_downslope == 0 && S[i*nx +j] < 0.0) S[i*nx +j] = 0.0;
         }
@@ -216,9 +242,33 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
         for (int j = 0; j < nx; j++) {
             qc[i*nx + j] = x[NEQ*(i*nx + j) + EQC];
             qs[i*nx + j] = x[NEQ*(i*nx + j) + EQS];
-            p[i*nx + j] = qs[i*nx + j] / tauf;
+			for (int k = 0; k < resdiv; k++) {
+				for (int l = 0; l < resdiv; l++) { 
+		            p[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)] = qs[i*nx + j] / tauf;
+				}
+			}
         }
     }
+
+#ifdef DEBUG
+	if (iproc == 0)
+	{
+		FILE *fp;
+
+        fp = NULL;
+        fp = fopen("outnumprecip.txt", "w");
+        if (fp == NULL) {
+            fprintf(stderr, "ERROR opening file for writing\n");
+            exit(1);
+        }
+        for (int i = 0; i < co->ny; i++) {
+            for (int j = 0; j < co->nx; j++) {
+                fprintf(fp, "%d,%d,0,%e\n", i,j,p[i*co->nx + j]);
+            }
+        }
+        fclose(fp);
+	}
+#endif
 
 	/* Cleanup call */
     solve_sparse_mkl(A, b, x, 1);
@@ -226,6 +276,7 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     free(qs);
     free(qc);
     free(S);
+	free(loh);
     free(grh);
     free(b);
     free(x);
