@@ -236,19 +236,22 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     /* Solve it! */
     solve_sparse_mkl(A, b, x, 0);
 
-    /* Transform solution vector to qc and qs components */
-
-    for (int i = 0; i < ny; i++) {
-        for (int j = 0; j < nx; j++) {
-            qc[i*nx + j] = x[NEQ*(i*nx + j) + EQC];
-            qs[i*nx + j] = x[NEQ*(i*nx + j) + EQS];
-			for (int k = 0; k < resdiv; k++) {
-				for (int l = 0; l < resdiv; l++) { 
-		            p[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)] = qs[i*nx + j] / tauf;
+    /* Transform solution vector to qc and qs components 
+	 * and broadcast to all other processes */
+	if (iproc == 0) {
+		for (int i = 0; i < ny; i++) {
+			for (int j = 0; j < nx; j++) {
+				qc[i*nx + j] = x[NEQ*(i*nx + j) + EQC];
+				qs[i*nx + j] = x[NEQ*(i*nx + j) + EQS];
+				for (int k = 0; k < resdiv; k++) {
+					for (int l = 0; l < resdiv; l++) { 
+						p[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)] = qs[i*nx + j] / tauf;
+					}
 				}
 			}
-        }
-    }
+		}
+	}
+	MPI_Bcast(p, nx*resdiv*ny*resdiv, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #ifdef DEBUG
 	if (iproc == 0)
