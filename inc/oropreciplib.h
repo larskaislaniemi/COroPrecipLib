@@ -30,15 +30,15 @@ struct cfg_thermodyn {
 
 /* Configuration parameters of the precipitation model */
 struct cfg_options {
-    int nx, ny; 		   // Resolution
+    int nx, ny;            // Resolution
     double dx, dy;         // Grid spacing
     double Lx, Ly;         // Domain size
     double U[2];           // Wind speed, y-, x-dir
     double tauc, tauf;     // Moisture conversion / precipitation time delays
     double Sbg;            // Background precipitation source
     int sink_at_downslope; // Allow negative precipitation at downslope side?
-	int downsample;        // downsample topography by this value
-	double z0;             // reference level (sealevel)
+    int downsample;        // downsample topography by this value
+    double z0;             // reference level (sealevel)
 };
 
 

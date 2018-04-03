@@ -37,10 +37,10 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
      *      sink_at_downslope [int]
      *                      0: Source term may become negative at downslope
      *                      1: Source term always >= 0
-	 *      downsample [int]
-	 *                      Downsample topography resolution by this coef
-	 *                      Used resolution <- Input resolution / 2^downsample
-	 *      z0 [double]     Reference level for topography; z_eff = z - z0
+     *      downsample [int]
+     *                      Downsample topography resolution by this coef
+     *                      Used resolution <- Input resolution / 2^downsample
+     *      z0 [double]     Reference level for topography; z_eff = z - z0
      *
      *  struct cfg_thermodyn *ct has following fields:
      *      rho_ref [double]    Density of air at reference level
@@ -66,16 +66,16 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     double U[2];
     double tauc, tauf;
     double ddx, ddy;
-	int resdiv;
-	int subnx, subny;
+    int resdiv;
+    int subnx, subny;
 
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
     MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
 
-	/* Calculate downsampling */
-	resdiv = powl(2, co->downsample);
-	assert (2*resdiv < co->nx);
-	assert (2*resdiv < co->ny);
+    /* Calculate downsampling */
+    resdiv = powl(2, co->downsample);
+    assert (2*resdiv < co->nx);
+    assert (2*resdiv < co->ny);
 
     /* Shorthand notation */
     nx = co->nx / resdiv; ny = co->ny / resdiv;
@@ -122,18 +122,18 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     assert (b != NULL);
     assert (x != NULL);
 
-	/* Do downsampling */
-	for (int i = 0; i < ny; i++) {
-		for (int j = 0; j < nx; j++) {
-			loh[i*nx + j] = 0.0;
-			for (int k = 0; k < resdiv; k++) {
-				for (int l = 0; l < resdiv; l++) {
-					loh[i*nx + j] += h[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)];
-				}
-			}
-			loh[i*nx + j] /= resdiv*resdiv;
-		}
-	}
+    /* Do downsampling */
+    for (int i = 0; i < ny; i++) {
+        for (int j = 0; j < nx; j++) {
+            loh[i*nx + j] = 0.0;
+            for (int k = 0; k < resdiv; k++) {
+                for (int l = 0; l < resdiv; l++) {
+                    loh[i*nx + j] += h[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)];
+                }
+            }
+            loh[i*nx + j] /= resdiv*resdiv;
+        }
+    }
 
     /* Calculate grad h */
     for (int i = 1; i < ny-1; i++) {
@@ -237,26 +237,26 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
     solve_sparse_mkl(A, b, x, 0);
 
     /* Transform solution vector to qc and qs components 
-	 * and broadcast to all other processes */
-	if (iproc == 0) {
-		for (int i = 0; i < ny; i++) {
-			for (int j = 0; j < nx; j++) {
-				qc[i*nx + j] = x[NEQ*(i*nx + j) + EQC];
-				qs[i*nx + j] = x[NEQ*(i*nx + j) + EQS];
-				for (int k = 0; k < resdiv; k++) {
-					for (int l = 0; l < resdiv; l++) { 
-						p[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)] = qs[i*nx + j] / tauf;
-					}
-				}
-			}
-		}
-	}
-	MPI_Bcast(p, nx*resdiv*ny*resdiv, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+     * and broadcast to all other processes */
+    if (iproc == 0) {
+        for (int i = 0; i < ny; i++) {
+            for (int j = 0; j < nx; j++) {
+                qc[i*nx + j] = x[NEQ*(i*nx + j) + EQC];
+                qs[i*nx + j] = x[NEQ*(i*nx + j) + EQS];
+                for (int k = 0; k < resdiv; k++) {
+                    for (int l = 0; l < resdiv; l++) { 
+                        p[(resdiv*i+k)*resdiv*nx + (resdiv*j+l)] = qs[i*nx + j] / tauf;
+                    }
+                }
+            }
+        }
+    }
+    MPI_Bcast(p, nx*resdiv*ny*resdiv, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #ifdef DEBUG
-	if (iproc == 0)
-	{
-		FILE *fp;
+    if (iproc == 0)
+    {
+        FILE *fp;
 
         fp = NULL;
         fp = fopen("outnumprecip.txt", "w");
@@ -270,16 +270,16 @@ void oroprecip(double *h, struct cfg_options *co, struct cfg_thermodyn *ct, doub
             }
         }
         fclose(fp);
-	}
+    }
 #endif
 
-	/* Cleanup call */
+    /* Cleanup call */
     solve_sparse_mkl(A, b, x, 1);
 
     free(qs);
     free(qc);
     free(S);
-	free(loh);
+    free(loh);
     free(grh);
     free(b);
     free(x);
